@@ -1,101 +1,121 @@
-import Image from "next/image";
+'use client'
+import React, { useState, useEffect } from 'react';
+import { startGame, makeGuess, getBetAmount, isGameActive } from './utils/contract';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [secretNumber, setSecretNumber] = useState('');
+  const [guess, setGuess] = useState('');
+  const [betAmount, setBetAmount] = useState('');
+  const [gameActive, setGameActive] = useState(false);
+  const [message, setMessage] = useState('');
+  const [transactionHash, setTransactionHash] = useState('');
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    const fetchGameState = async () => {
+      try {
+        const active = await isGameActive();
+        setGameActive(active);
+        if (active) {
+          const bet = await getBetAmount();
+          setBetAmount(bet);
+        }
+      } catch (error) {
+        console.error("Error fetching game state:", error);
+        setMessage("Error fetching game state. Please make sure you're connected to the correct network.");
+      }
+    };
+    fetchGameState();
+  }, []);
+
+  const handleStartGame = async () => {
+    try {
+      setMessage("Initiating transaction...");
+      console.log("Starting game with:", { secretNumber, betAmount });
+      const receipt = await startGame(Number(secretNumber), betAmount);
+      setTransactionHash(receipt.transactionHash);
+      setMessage(`Game started successfully! Transaction hash: ${receipt.transactionHash}`);
+      setGameActive(true);
+    } catch (error : any) {
+      console.error("Error starting game:", error);
+      setMessage('Error starting game: ' + (error.message || "Unknown error"));
+    }
+  };
+
+  const handleMakeGuess = async () => {
+    try {
+      setMessage("Submitting guess...");
+      console.log("Making guess:", guess);
+      const correct = await makeGuess(Number(guess), betAmount);
+      setMessage(correct ? 'Congratulations! You guessed correctly!' : 'Sorry, wrong guess. Try again!');
+      if (correct) setGameActive(false);
+    } catch (error: any) {
+      console.error("Error making guess:", error);
+      setMessage('Error making guess: ' + (error.message || "Unknown error"));
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
+      <div className="relative py-3 sm:max-w-xl sm:mx-auto">
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-light-blue-500 shadow-lg transform -skew-y-6 sm:skew-y-0 sm:-rotate-6 sm:rounded-3xl"></div>
+        <div className="relative px-4 py-10 bg-white shadow-lg sm:rounded-3xl sm:p-20">
+          <div className="max-w-md mx-auto">
+            <div className="divide-y divide-gray-200">
+              <div className="py-8 text-base leading-6 space-y-4 text-gray-700 sm:text-lg sm:leading-7">
+                <h2 className="text-3xl font-extrabold text-gray-900">Guess the Number Game</h2>
+                {!gameActive ? (
+                  <div className="space-y-4">
+                    <input
+                      type="number"
+                      placeholder="Secret Number"
+                      value={secretNumber}
+                      onChange={(e) => setSecretNumber(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      type="number"
+                      step="0.0001"
+                      placeholder="Bet Amount (ETH)"
+                      value={betAmount}
+                      onChange={(e) => setBetAmount(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={handleStartGame}
+                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      Start Game
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p>Current bet amount: {betAmount} ETH</p>
+                    <input
+                      type="number"
+                      placeholder="Your Guess"
+                      value={guess}
+                      onChange={(e) => setGuess(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={handleMakeGuess}
+                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    >
+                      Make Guess
+                    </button>
+                  </div>
+                )}
+                {message && <p className="mt-4 text-sm text-gray-500">{message}</p>}
+                {transactionHash && (
+                  <p className="mt-2 text-xs text-blue-500">
+                    Transaction Hash: {transactionHash}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
     </div>
   );
 }
